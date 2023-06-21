@@ -26,12 +26,17 @@ CHANNELS_NUM_IN_LAST_CONV = {
 
 IMAGE_SIZE_AFTER_SECOND_TO_LAST_CONV = {
     "ResNet18": 14,
-
+}
+AGGREGATION_LAYERS = {
+    "gem",
+    "adaptive",
+    "attention",
+    "mixVPR"
 }
 
 
 class GeoLocalizationNet(nn.Module):
-    def __init__(self, backbone : str, fc_output_dim : int):
+    def __init__(self, backbone : str, aggregation : str, fc_output_dim : int):
         """Return a model for GeoLocalization.
         
         Args:
@@ -41,25 +46,10 @@ class GeoLocalizationNet(nn.Module):
         super().__init__()
         assert backbone in CHANNELS_NUM_IN_LAST_CONV, f"backbone must be one of {list(CHANNELS_NUM_IN_LAST_CONV.keys())}"
         self.backbone, features_dim = get_backbone(backbone)
-        #self.backbone = torch.nn.Sequential(*list(self.backbone.children())[:-1])
-        self.aggregation = nn.Sequential(
-            L2Norm(),
-            #AdaptivePooling(),
-            #AttentionPooling(CHANNELS_NUM_IN_LAST_CONV[backbone]),
-            GeM(),
-            #MixVPR(
-              #  in_channels=int(CHANNELS_NUM_IN_LAST_CONV[backbone]/2),
-              #  in_h=IMAGE_SIZE_AFTER_SECOND_TO_LAST_CONV[backbone],
-              #  in_w=IMAGE_SIZE_AFTER_SECOND_TO_LAST_CONV[backbone],
-              #  out_channels=32,
-              #  mix_depth=4,
-               # mlp_ratio=1,
-               # out_rows=4,
-            #),
-            Flatten(),
-            nn.Linear(features_dim, fc_output_dim),
-            L2Norm()
-        )
+        assert aggregation in AGGREGATION_LAYERS
+        if args.aggregation == "mixVPR":
+            self.backbone = torch.nn.Sequential(*list(self.backbone.children())[:-1])
+        self.aggregation = get_aggregation_layer(aggregation)
     
     def forward(self, x):
         x = self.backbone(x)
@@ -118,3 +108,28 @@ def get_backbone(backbone_name : str) -> Tuple[torch.nn.Module, int]:
     features_dim = CHANNELS_NUM_IN_LAST_CONV[backbone_name]
     
     return backbone, features_dim
+def get_aggregation(aggregation_layer : str):
+    previous = [L2Norm()]
+    following = [Flatten(),
+                 nn.Linear(features_dim, fc_output_dim),
+                 L2Norm()]
+    if aggregation_layer == "gem":
+        aggregation = previous.extend([GeM()]).extend(following)
+    elif aggregation_layer == "adaptive":
+        aggregation = previous.extend([AdaptivePooling()]).extend(following)
+    elif aggregation_layer == "attention":
+        aggregation = previous.extend([AttentionPooling(CHANNELS_NUM_IN_LAST_CONV[backbone])]).extend(following)
+    elif aggregation_layer == "mixVPR":
+        assert args.mixVPR_depth > 0
+        aggregation = [L2Norm(),
+                       MixVPR(in_channels=int(CHANNELS_NUM_IN_LAST_CONV[backbone]/2),
+                               in_h=IMAGE_SIZE_AFTER_SECOND_TO_LAST_CONV[backbone],
+                               in_w=IMAGE_SIZE_AFTER_SECOND_TO_LAST_CONV[backbone],
+                               out_channels=32,
+                               mix_depth=args.VPR_depth,
+                               mlp_ratio=1,
+                               out_rows=4),
+                        Flatten(),
+                        L2Norm()]
+    return torch.nn.Sequential(aggregation)
+    
