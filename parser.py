@@ -17,7 +17,11 @@ def parse_arguments(is_training: bool = True):
                         choices=["VGG16",
                         "ResNet18", "ResNet50", "ResNet101", "ResNet152",
                         "EfficientNet_b1", "EfficientNet_b0", "EfficientNet_b2",
-                        "MobileViTV2_050", "MobileViTV2_100", "MobileViTV2_150"], help="_")
+                        "MobileViTV2_050", "MobileViTV2_100", "MobileViTV2_150"],
+                        help="_")
+    parser.add_argument("--aggregation", type=str, default="gem",
+                       choices=["gem", "adaptive", "attention", "mixVPR"],
+                       help="_")
     parser.add_argument("--fc_output_dim", type=int, default=512,
                         help="Output dimension of final fully connected layer")
     # Training parameters
