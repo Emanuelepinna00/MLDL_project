@@ -22,6 +22,7 @@ def parse_arguments(is_training: bool = True):
     parser.add_argument("--aggregation", type=str, default="gem",
                        choices=["gem", "adaptive", "attention", "mixVPR"],
                        help="_")
+    parser.add_argument("--mixVPR_depth", type=int, default = "4", help="_")
     parser.add_argument("--fc_output_dim", type=int, default=512,
                         help="Output dimension of final fully connected layer")
     # Training parameters
